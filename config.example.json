@@ -1,0 +1,55 @@
+{
+  "paths": {
+    "work_root": "work",
+    "log_root": "logs",
+    "inbox_root": "inbox",
+    "export_root": "exports"
+  },
+  "tools": {
+    "ffmpeg_bin_dir": "tools/ffmpeg/bin"
+  },
+  "extensions": {
+    "pair_audio": [".mp3", ".wav"],
+    "pair_lyric": [".txt", ".doc", ".docx"],
+    "tempo_audio": [".wav", ".mp3"],
+    "uvr5_audio": [".wav", ".mp3", ".flac", ".m4a"],
+    "game_audio": [".wav", ".mp3", ".flac", ".m4a"],
+    "game_midi": [".mid", ".midi"]
+  },
+  "uvr5": {
+    "runner_command": ["uv", "run", "--python", "3.12", "audio-separator"],
+    "device": "cpu",
+    "model_file_dir": "tools/uvr5-models",
+    "model": "vocals_mel_band_roformer.ckpt",
+    "single_stem": "Vocals",
+    "output_format": "WAV",
+    "extra_args": []
+  },
+  "tempo": {
+    "sample_rate": 22050,
+    "bpm_low": 45.0,
+    "bpm_high": 140.0
+  },
+  "game": {
+    "repo_root": "../GAME",
+    "runner_command": [
+      "uv",
+      "run",
+      "--python",
+      "3.12",
+      "--with-requirements",
+      "requirements.txt",
+      "--with",
+      "torch",
+      "python",
+      "infer.py"
+    ],
+    "model_path": "",
+    "language": "zh",
+    "seg_threshold": 0.6,
+    "est_threshold": 0.6,
+    "batch_size": 1,
+    "num_workers": 0,
+    "precision": "32-true"
+  }
+}

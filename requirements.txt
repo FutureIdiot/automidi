@@ -1,0 +1,14 @@
+# ===== 核心功能 =====
+librosa
+soundfile
+
+# ===== 人声分离 =====
+audio-separator
+onnxruntime
+
+# ===== MIDI 生成（GAME）=====
+torch
+
+# ===== 常用基础（有时不会自动带）=====
+numpy
+scipy

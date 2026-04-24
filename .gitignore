@@ -1,0 +1,32 @@
+# Local configuration
+config.json
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments and uv
+.venv/
+venv/
+.python-version
+.uv-cache/
+
+# Runtime data
+work/
+logs/
+exports/
+old/
+tools/ffmpeg/
+tools/uvr5-models/
+
+# Local inbox/source assets
+inbox/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
