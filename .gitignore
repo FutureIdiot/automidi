@@ -15,15 +15,29 @@ venv/
 .uv-cache/
 
 # Runtime data
-work/
-logs/
-exports/
+work/**
+logs/**
+exports/**
 old/
-tools/ffmpeg/
-tools/uvr5-models/
+tools/ffmpeg/**
+tools/uvr5-models/**
+!work/
+!logs/
+!exports/
+!tools/
+!tools/ffmpeg/
+!tools/uvr5-models/
+!work/.gitkeep
+!logs/.gitkeep
+!exports/.gitkeep
+!tools/.gitkeep
+!tools/ffmpeg/.gitkeep
+!tools/uvr5-models/.gitkeep
 
 # Local inbox/source assets
-inbox/
+inbox/**
+!inbox/
+!inbox/.gitkeep
 
 # OS/editor noise
 .DS_Store

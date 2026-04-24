@@ -107,37 +107,43 @@ def scan_pairs(input_dir, *, audio_exts, lyric_exts):
     return paired, missing_audio, missing_lyric, duplicate_audio, duplicate_lyric, ignored_files
 
 
-def build_worktree(batch_name, paired, dry_run, work_root, log_root):
-    work_batch_dir = work_root / batch_name
+def resolve_work_dir(input_dir, inbox_root, work_root):
+    if input_dir.resolve() == inbox_root.resolve():
+        return work_root
+    return work_root / input_dir.name
+
+
+def build_worktree(work_dir, items, dry_run, log_root):
     log_root.mkdir(parents=True, exist_ok=True)
 
     created = []
 
-    for item in paired:
+    for item in items:
         song_id = safe_name(item["song_id"])
-        song_root = work_batch_dir / song_id
+        song_root = work_dir / song_id
 
         input_dir = song_root / "input"
         process_dir = song_root / "process"
         output_dir = song_root / "output"
 
         audio_src = Path(item["audio"])
-        lyric_src = Path(item["lyric"])
+        lyric_value = item.get("lyric")
+        lyric_src = Path(lyric_value) if lyric_value else None
 
         audio_dst = input_dir / audio_src.name
-        lyric_dst = input_dir / lyric_src.name
+        lyric_dst = input_dir / lyric_src.name if lyric_src else None
         workspace_existed = song_root.exists()
         audio_dst_existed = audio_dst.exists()
-        lyric_dst_existed = lyric_dst.exists()
+        lyric_dst_existed = lyric_dst.exists() if lyric_dst else False
         overwritten = audio_dst_existed or lyric_dst_existed
 
         created.append({
             "song_id": song_id,
             "song_root": str(song_root),
             "audio_src": str(audio_src),
-            "lyric_src": str(lyric_src),
+            "lyric_src": str(lyric_src) if lyric_src else None,
             "audio_dst": str(audio_dst),
-            "lyric_dst": str(lyric_dst),
+            "lyric_dst": str(lyric_dst) if lyric_dst else None,
             "workspace_existed": workspace_existed,
             "audio_dst_existed": audio_dst_existed,
             "lyric_dst_existed": lyric_dst_existed,
@@ -150,7 +156,8 @@ def build_worktree(batch_name, paired, dry_run, work_root, log_root):
             output_dir.mkdir(parents=True, exist_ok=True)
 
             copy_file(audio_src, audio_dst)
-            copy_file(lyric_src, lyric_dst)
+            if lyric_src and lyric_dst:
+                copy_file(lyric_src, lyric_dst)
 
     return created
 
@@ -177,7 +184,7 @@ def clear_input_dir(input_dir):
 
 def has_existing_batch(work_root, batch_name):
     work_batch_dir = work_root / batch_name
-    return work_batch_dir.exists() and any(work_batch_dir.iterdir())
+    return work_batch_dir.exists() and any(p.name != ".gitkeep" for p in work_batch_dir.iterdir())
 
 
 def main():
@@ -203,8 +210,9 @@ def main():
         base_dir = input_dir.parent
 
     batch_name = input_dir.name
-    if not dry_run and has_existing_batch(config.paths.work_root, batch_name):
-        print(f"[ERROR] Work batch already exists and is not empty: {config.paths.work_root / batch_name}")
+    work_dir = resolve_work_dir(input_dir, config.paths.inbox_root, config.paths.work_root)
+    if not dry_run and work_dir.exists() and any(p.name != ".gitkeep" for p in work_dir.iterdir()):
+        print(f"[ERROR] Work target already exists and is not empty: {work_dir}")
         sys.exit(1)
 
     (
@@ -219,11 +227,11 @@ def main():
         audio_exts=config.extensions.pair_audio,
         lyric_exts=config.extensions.pair_lyric,
     )
+    work_items = paired + missing_lyric
     created = build_worktree(
-        batch_name,
-        paired,
+        work_dir,
+        work_items,
         dry_run,
-        config.paths.work_root,
         config.paths.log_root,
     )
     existing_workspace_count = sum(1 for item in created if item["workspace_existed"])
@@ -234,7 +242,6 @@ def main():
 
     cleanup_blockers = (
         missing_audio
-        or missing_lyric
         or duplicate_audio
         or duplicate_lyric
         or ignored_files

@@ -1,10 +1,12 @@
 # AutoMIDI
 
-AutoMIDI is a local batch pipeline for turning song assets into MIDI files.
+A local automation pipeline for extracting vocal melody MIDI from songs.
+
+It combines tempo detection, vocal separation, and vocal-to-MIDI generation into a repeatable workflow.
 
 Current pipeline:
 
-`inbox -> pair -> work -> tempo -> UVR5 -> GAME -> exports`
+`Audio Song -> Tempo Detection -> Vocal Separation -> Vocal MIDI Generation -> Export`
 
 Implemented stages:
 
@@ -19,7 +21,7 @@ Implemented stages:
 
 - The default input directory is `paths.inbox_root` from `config.json`
 - Each batch is a folder placed under `inbox/`
-- Each song is expected to have one audio file and one lyric file
+- Each song must have one audio file; lyric files are optional
 - Supported extensions for each stage are managed in `config.json -> extensions`
 - `pipeline.py --run` executes the full chain: `pair -> tempo -> uvr5 -> game -> export`
 
@@ -27,37 +29,39 @@ Implemented stages:
 
 ```text
 automidi/
-├── inbox/                # input batches
-├── work/                 # per-batch / per-song workspace
-├── exports/              # aggregated MIDI exports per batch
-├── logs/                 # pipeline reports
-├── lib/                  # core logic
-├── scripts/              # CLI entrypoints
-├── tools/
-│   ├── ffmpeg/           # bundled FFmpeg
-│   └── uvr5-models/      # local UVR5 model cache
-├── config.json           # local machine config, not committed
-├── config.example.json   # config template
-├── pyproject.toml
-├── requirements.txt
-├── setup_uv_env.ps1
-└── run_pipeline.ps1
+|-- inbox/                # input batches
+|-- work/                 # per-batch / per-song workspace
+|-- exports/              # aggregated MIDI exports per batch
+|-- logs/                 # pipeline reports
+|-- lib/                  # core logic
+|-- scripts/              # CLI entrypoints
+|-- tools/
+|   |-- ffmpeg/           # bundled FFmpeg
+|   `-- uvr5-models/      # local UVR5 model cache
+|-- config.json           # local machine config, not committed
+|-- config.example.json   # config template
+|-- pyproject.toml
+|-- requirements.txt
+|-- setup_uv_env.ps1
+`-- run_pipeline.ps1
 ```
 
 ## Workspace Layout
 
-Each song is processed under `work/<batch>/<song>/`:
+When the input directory is the root `inbox/`, each song is processed under `work/<song>/`.
+
+When the input directory is a batch subfolder such as `inbox/<batch>/`, each song is processed under `work/<batch>/<song>/`.
 
 ```text
-work/<batch>/<song>/
-├── input/
-├── process/
-│   ├── tempo.json
-│   ├── uvr5_result.json
-│   ├── game_result.json
-│   └── uvr5/
-└── output/
-    └── game/
+work/<song>/
+|-- input/
+|-- process/
+|   |-- tempo.json
+|   |-- uvr5_result.json
+|   |-- game_result.json
+|   `-- uvr5/
+`-- output/
+    `-- game/
 ```
 
 After the full pipeline finishes, final MIDI files are also copied to:
@@ -65,6 +69,18 @@ After the full pipeline finishes, final MIDI files are also copied to:
 ```text
 exports/<batch>/
 ```
+
+## Dependencies
+
+- UVR5-compatible separator  
+  Used to isolate the vocal stem from the original audio. No separate UVR5 GUI install is required for this repository setup.
+
+- GAME  
+  Repository: https://github.com/openvpi/GAME  
+  Used to generate vocal melody MIDI from the separated vocal track.
+
+- FFmpeg  
+  Used for audio format handling.
 
 ## Configuration
 
@@ -244,12 +260,13 @@ uv run --python 3.12 python scripts\detect_tempo.py --batch inbox --force-tempo
 - Matches audio and lyric files by normalized stem
 - Removes trailing ` demo` from audio names before matching
 - Uses `extensions.pair_audio` and `extensions.pair_lyric`
+- Audio-only items continue through the pipeline even when no lyric file is matched
 - Duplicate audio or duplicate lyric files are reported as errors
 
 ### Batch Naming
 
 - `batch_name = input_dir.name`
-- If `work/<batch_name>` already exists and is not empty, the pipeline aborts
+- If the target work directory already exists and is not empty, the pipeline aborts
 
 ### Stage Skip Rules
 
@@ -260,13 +277,13 @@ uv run --python 3.12 python scripts\detect_tempo.py --batch inbox --force-tempo
 ### Cleanup
 
 - Input files are only removed when `--delete-source` is used
-- Cleanup only happens when the batch has no missing files, duplicates, or ignored files
+- Cleanup only happens when the batch has no missing audio, duplicates, or ignored files
 
 ### Exports
 
-- Per-song GAME output stays in `work/<batch>/<song>/output/game/`
+- Per-song GAME output stays in the song workspace under `work/.../<song>/output/game/`
 - The pipeline also copies each final MIDI into `exports/<batch>/`
-- Export filenames are based on the song workspace directory name
+- Export filenames use the song workspace directory name and append BPM when available, e.g. `song_117bpm.mid`
 
 ## Reports
 

@@ -16,7 +16,7 @@ from lib.game_runner import run_game_for_song, save_game_result
 from lib.tempo import estimate_tempo, save_result as save_tempo_result
 from lib.uvr5_runner import run_uvr_for_song, save_uvr_result
 from scripts.detect_tempo import find_audio, has_tempo_result
-from scripts.pair import build_worktree, clear_input_dir, has_existing_batch, scan_pairs
+from scripts.pair import build_worktree, clear_input_dir, resolve_work_dir, scan_pairs
 from scripts.run_game import has_ok_game_result
 from scripts.run_uvr5 import has_ok_uvr5_result
 
@@ -248,8 +248,19 @@ def collect_batch_exports(
         if not src.exists() or not src.is_file():
             continue
 
+        tempo_path = song_dir / "process" / "tempo.json"
+        export_name = song_dir.name
+        if tempo_path.exists():
+            try:
+                tempo_data = json.loads(tempo_path.read_text(encoding="utf-8"))
+                rounded_bpm = tempo_data.get("rounded_bpm")
+                if rounded_bpm is not None:
+                    export_name = f"{song_dir.name}_{rounded_bpm}bpm"
+            except (OSError, json.JSONDecodeError):
+                pass
+
         export_batch_dir.mkdir(parents=True, exist_ok=True)
-        dst = export_batch_dir / f"{song_dir.name}{src.suffix.lower()}"
+        dst = export_batch_dir / f"{export_name}{src.suffix.lower()}"
         shutil.copy2(src, dst)
         exported.append({
             "song_root": str(song_dir),
@@ -277,7 +288,6 @@ def collect_failures(
 
     for key, items in (
         ("missing_audio", missing_audio),
-        ("missing_lyric", missing_lyric),
         ("duplicate_audio", duplicate_audio),
         ("duplicate_lyric", duplicate_lyric),
         ("ignored_files", ignored_files),
@@ -378,10 +388,9 @@ def main() -> None:
 
     batch_name = input_dir.name
     base_dir = _base_dir_for(input_dir)
-    if not dry_run and has_existing_batch(config.paths.work_root, batch_name):
-        raise SystemExit(
-            f"[ERROR] Work batch already exists and is not empty: {config.paths.work_root / batch_name}"
-        )
+    work_dir = resolve_work_dir(input_dir, config.paths.inbox_root, config.paths.work_root)
+    if not dry_run and work_dir.exists() and any(p.name != ".gitkeep" for p in work_dir.iterdir()):
+        raise SystemExit(f"[ERROR] Work target already exists and is not empty: {work_dir}")
 
     print(f"[PIPELINE] input={input_dir}")
     print(f"[PIPELINE] batch={batch_name}")
@@ -399,11 +408,11 @@ def main() -> None:
         audio_exts=config.extensions.pair_audio,
         lyric_exts=config.extensions.pair_lyric,
     )
+    work_items = paired + missing_lyric
     created = build_worktree(
-        batch_name,
-        paired,
+        work_dir,
+        work_items,
         dry_run,
-        config.paths.work_root,
         config.paths.log_root,
     )
     existing_workspace_count = sum(1 for item in created if item["workspace_existed"])
@@ -486,7 +495,6 @@ def main() -> None:
 
         cleanup_blockers = (
             missing_audio
-            or missing_lyric
             or duplicate_audio
             or duplicate_lyric
             or ignored_files
